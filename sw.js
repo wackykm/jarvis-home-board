@@ -1,5 +1,5 @@
 // Keeps the board installable and lets it open without a connection.
-var CACHE = 'jarvis-board-v2';
+var CACHE = 'jarvis-board-v3';
 var SHELL = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', function (e) {
