@@ -91,6 +91,25 @@ body { font-family: var(--text); font-size: clamp(12px, 1.9vmin, 18px); -webkit-
 .status.err { color: var(--bad); }
 .hint { position: fixed; inset: auto 0 0; text-align: center; padding: 6px; font-size: 0.75em; color: var(--faint); pointer-events: none; transition: opacity 1s; }
 
+/* Ring display: concentric rings turning at different speeds around a glowing core */
+.hud { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; position: relative; }
+.hud svg { width: 100%; height: 100%; max-height: 34vh; overflow: visible; }
+.hud .r { transform-box: view-box; transform-origin: 100px 100px; fill: none; stroke: var(--accent); }
+.hud .r1 { stroke-width: 0.6; opacity: 0.35; stroke-dasharray: 1 3; animation: spin 90s linear infinite; }
+.hud .r2 { stroke-width: 2.4; opacity: 0.75; stroke-dasharray: 60 22 14 22 40 30; animation: spin 26s linear infinite reverse; }
+.hud .r3 { stroke-width: 5; opacity: 0.22; stroke-dasharray: 1.2 4.2; animation: spin 48s linear infinite; }
+.hud .r4 { stroke-width: 3.2; opacity: 0.9; stroke-dasharray: 70 106; stroke-linecap: round; animation: spin 11s linear infinite; }
+.hud .r5 { stroke-width: 0.8; opacity: 0.5; stroke-dasharray: 18 10; animation: spin 18s linear infinite reverse; }
+.hud .core { transform-box: view-box; transform-origin: 100px 100px; animation: breathe 4.5s ease-in-out infinite; }
+.hud .ping { transform-box: view-box; transform-origin: 100px 100px; fill: none; stroke: var(--accent); stroke-width: 1.2; opacity: 0; }
+.hud.pinged .ping { animation: ping 1.6s ease-out 1; }
+.hud .num { font-family: var(--display); font-weight: 300; font-size: 30px; fill: var(--fg); text-anchor: middle; dominant-baseline: central; }
+.hud .cap { font-family: var(--text); font-weight: 600; font-size: 6px; letter-spacing: 1.6px; fill: var(--muted); text-anchor: middle; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes breathe { 0%, 100% { transform: scale(0.94); opacity: 0.75; } 50% { transform: scale(1.04); opacity: 1; } }
+@keyframes ping { 0% { transform: scale(0.45); opacity: 0.9; } 100% { transform: scale(1.15); opacity: 0; } }
+body.night .hud .r, body.night .hud .core { animation-duration: 240s; }
+
 /* Night mode: dimmer between 10 PM and 6 AM */
 body.night .board { filter: brightness(0.55); }
 
@@ -101,8 +120,9 @@ body.night .board { filter: brightness(0.55); }
   .main { grid-template-rows: auto auto; }
   .row { grid-template-columns: 1fr; }
   .idea { margin-top: 0; }
+  .hud svg { max-height: 40vw; }
 }
-@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 </style>
 </head>
 <body>
@@ -120,6 +140,26 @@ body.night .board { filter: brightness(0.55); }
         <div class="wx-hilo" id="wx-hilo"></div>
       </div>
       <div class="wx-vs same" id="wx-vs"></div>
+    </div>
+    <div class="hud" id="hud" aria-hidden="true">
+      <svg viewBox="0 0 200 200" preserveAspectRatio="xMidYMid meet">
+        <defs>
+          <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="#5ec8f2" stop-opacity="0.55"/>
+            <stop offset="55%" stop-color="#5ec8f2" stop-opacity="0.12"/>
+            <stop offset="100%" stop-color="#5ec8f2" stop-opacity="0"/>
+          </radialGradient>
+        </defs>
+        <circle class="r r1" cx="100" cy="100" r="94"/>
+        <circle class="r r2" cx="100" cy="100" r="84"/>
+        <circle class="r r3" cx="100" cy="100" r="72"/>
+        <circle class="r r4" cx="100" cy="100" r="62"/>
+        <circle class="r r5" cx="100" cy="100" r="52"/>
+        <circle class="ping" cx="100" cy="100" r="80"/>
+        <circle class="core" cx="100" cy="100" r="44" fill="url(#glow)"/>
+        <text class="num" id="hud-n" x="100" y="96">0</text>
+        <text class="cap" id="hud-cap" x="100" y="118">DUE TODAY</text>
+      </svg>
     </div>
     <div class="idea">
       <div class="label">Idea of the day</div>
@@ -215,6 +255,8 @@ body.night .board { filter: brightness(0.55); }
     g.replaceChildren(document.createTextNode(greetWord + ', Kevin. '));
     if (!data) return;
     var dueToday = (data.todos || []).filter(function (t) { return t.due && dayDiff(dateOnly(t.due)) <= 0; }).length;
+    $('hud-n').textContent = String(dueToday);
+    $('hud-cap').textContent = dueToday === 1 ? 'THING DUE TODAY' : 'DUE TODAY';
     if (dueToday) {
       g.appendChild(el('b', null, String(dueToday)));
       g.appendChild(document.createTextNode(dueToday === 1 ? ' thing due today.' : ' things due today.'));
@@ -303,6 +345,7 @@ body.night .board { filter: brightness(0.55); }
       .then(function (j) {
         if (!j.ok) throw new Error(j.error || 'error');
         data = j; render();
+        var hud = $('hud'); hud.classList.remove('pinged'); void hud.offsetWidth; hud.classList.add('pinged');
         store.set('jv_last', JSON.stringify(j));
         setStatus('Updated ' + timeWord(new Date()) + (j.errors && j.errors.length ? ' · some items didn’t load' : ''), !!(j.errors && j.errors.length));
       })
