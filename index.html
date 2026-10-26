@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0b0f14">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Jarvis Home Board</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@300;500&family=Barlow:wght@400;500;600&display=swap">
+<style>
+/* Layout: always-on wall display. Left rail = time, weather, idea. Right = to-dos over a row of three small cards. One screen, never scrolls. */
+:root {
+  --bg: #0b0f14;
+  --panel: #111821;
+  --line: #1e2935;
+  --fg: #e6edf4;
+  --muted: #8796a6;
+  --faint: #56636f;
+  --accent: #5ec8f2;
+  --warn: #f2b45e;
+  --bad: #f27a63;
+  --display: "Barlow Condensed", "Roboto Condensed", "Arial Narrow", sans-serif;
+  --text: "Barlow", "Roboto", "Segoe UI", sans-serif;
+  --gap: clamp(8px, 1.4vmin, 16px);
+  --pad: clamp(10px, 2vmin, 22px);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; background: var(--bg); color: var(--fg); overflow: hidden; }
+body { font-family: var(--text); font-size: clamp(12px, 1.9vmin, 18px); -webkit-tap-highlight-color: transparent; -webkit-user-select: none; user-select: none; }
+
+.board { height: 100vh; height: 100dvh; display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 2fr); gap: var(--gap);
+  padding: var(--pad) max(var(--pad), env(safe-area-inset-right, 0px)) var(--pad) max(var(--pad), env(safe-area-inset-left, 0px)); }
+
+/* Left rail */
+.rail { display: flex; flex-direction: column; gap: var(--gap); min-height: 0; }
+.time { display: flex; align-items: baseline; gap: 0.25em; }
+.clock { font-family: var(--display); font-weight: 300; font-size: clamp(64px, 17vmin, 168px); line-height: 0.85; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+.ampm { font-family: var(--display); font-weight: 500; font-size: clamp(14px, 3vmin, 28px); color: var(--muted); letter-spacing: 0.08em; }
+.date { font-size: 1.25em; color: var(--muted); margin-top: 0.3em; }
+.greet { font-size: 1.1em; line-height: 1.4; margin: 0; }
+.greet b { color: var(--accent); font-weight: 600; }
+
+.weather { border-top: 1px solid var(--line); padding-top: var(--gap); display: grid; grid-template-columns: auto 1fr; column-gap: 0.8em; align-items: center; }
+.temp { font-family: var(--display); font-weight: 300; font-size: clamp(40px, 9vmin, 88px); line-height: 0.9; font-variant-numeric: tabular-nums; }
+.wx-words { display: grid; gap: 0.15em; min-width: 0; }
+.wx-cond { font-weight: 500; }
+.wx-hilo { color: var(--muted); font-variant-numeric: tabular-nums; }
+.wx-vs { grid-column: 1 / -1; margin-top: 0.4em; font-size: 0.95em; }
+.wx-vs.warmer { color: var(--warn); }
+.wx-vs.colder { color: var(--accent); }
+.wx-vs.same { color: var(--muted); }
+
+.idea { margin-top: auto; border-top: 1px solid var(--line); padding-top: var(--gap); min-height: 0; }
+.idea-title { font-size: 1.15em; line-height: 1.3; margin-top: 0.35em; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.idea-meta { color: var(--muted); font-size: 0.85em; margin-top: 0.35em; }
+
+/* Right side */
+.main { display: grid; grid-template-rows: minmax(0, 1.35fr) minmax(0, 1fr); gap: var(--gap); min-height: 0; }
+.row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--gap); min-height: 0; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: var(--pad); display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+.label { font-size: 0.78em; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); display: flex; justify-content: space-between; gap: 1em; }
+.label .count { color: var(--faint); letter-spacing: 0.04em; font-variant-numeric: tabular-nums; }
+.list { list-style: none; margin: 0.5em 0 0; padding: 0; overflow: hidden; min-height: 0; flex: 1; }
+.list li { display: flex; justify-content: space-between; align-items: baseline; gap: 1em; padding: 0.5em 0; border-top: 1px solid var(--line); }
+.list li:first-child { border-top: 0; }
+.todos .list li { font-size: 1.12em; }
+.item { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.when { flex: none; color: var(--muted); font-size: 0.85em; font-variant-numeric: tabular-nums; }
+.when.today { color: var(--warn); font-weight: 600; }
+.when.late { color: var(--bad); font-weight: 600; }
+.pri { display: inline-block; width: 0.45em; height: 0.45em; border-radius: 50%; background: var(--accent); margin-right: 0.55em; vertical-align: 0.15em; }
+.pri.none { background: transparent; }
+.empty { color: var(--faint); margin-top: 0.6em; line-height: 1.4; }
+
+.cal .list li { flex-direction: column; gap: 0.1em; align-items: flex-start; }
+.cal .when { font-size: 0.8em; }
+.cal .item { max-width: 100%; }
+
+.trip-days { font-family: var(--display); font-weight: 300; font-size: clamp(36px, 7.5vmin, 72px); line-height: 1; margin-top: 0.15em; font-variant-numeric: tabular-nums; }
+.trip-days small { font-family: var(--text); font-size: 0.28em; color: var(--muted); margin-left: 0.3em; letter-spacing: 0; }
+.trip-name { font-weight: 600; margin-top: 0.3em; }
+.trip-where { color: var(--muted); }
+
+.status { position: fixed; right: max(var(--pad), env(safe-area-inset-right, 0px)); bottom: 4px; font-size: 0.68em; color: var(--faint); }
+.status.err { color: var(--bad); }
+.hint { position: fixed; inset: auto 0 0; text-align: center; padding: 6px; font-size: 0.75em; color: var(--faint); pointer-events: none; transition: opacity 1s; }
+
+/* Night mode: dimmer between 10 PM and 6 AM */
+body.night .board { filter: brightness(0.55); }
+
+/* Narrow or portrait */
+@media (max-aspect-ratio: 1/1) {
+  html, body { overflow: auto; }
+  .board { height: auto; grid-template-columns: 1fr; }
+  .main { grid-template-rows: auto auto; }
+  .row { grid-template-columns: 1fr; }
+  .idea { margin-top: 0; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<main class="board" id="board">
+  <aside class="rail">
+    <div>
+      <div class="time"><span class="clock" id="clock">--:--</span><span class="ampm" id="ampm"></span></div>
+      <div class="date" id="date"></div>
+    </div>
+    <p class="greet" id="greet"></p>
+    <div class="weather" id="weather">
+      <div class="temp" id="temp">--&deg;</div>
+      <div class="wx-words">
+        <div class="wx-cond" id="wx-cond">Weather</div>
+        <div class="wx-hilo" id="wx-hilo"></div>
+      </div>
+      <div class="wx-vs same" id="wx-vs"></div>
+    </div>
+    <div class="idea">
+      <div class="label">Idea of the day</div>
+      <div class="idea-title" id="idea-title"></div>
+      <div class="idea-meta" id="idea-meta"></div>
+    </div>
+  </aside>
+
+  <section class="main">
+    <div class="card todos">
+      <div class="label"><span>To-dos</span><span class="count" id="todo-count"></span></div>
+      <ul class="list" id="todo-list"></ul>
+    </div>
+    <div class="row">
+      <div class="card cal">
+        <div class="label">Calendar</div>
+        <ul class="list" id="cal-list"></ul>
+      </div>
+      <div class="card bills">
+        <div class="label">Bills this week</div>
+        <ul class="list" id="bill-list"></ul>
+      </div>
+      <div class="card trip">
+        <div class="label">Next trip</div>
+        <div id="trip-body"></div>
+      </div>
+    </div>
+  </section>
+</main>
+<div class="status" id="status"></div>
+<div class="hint" id="hint">Tap anywhere for full screen</div>
+
+<script>
+(function () {
+  'use strict';
+
+  // ---- settings: the data link and key come from the setup link (#api=...&key=...) and are remembered on this tablet
+  var LAT = 38.6487, LON = -78.6714; // New Market, VA
+  var store = {
+    get: function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+    set: function (k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  };
+  if (location.hash.length > 1) {
+    var hp = {};
+    location.hash.slice(1).split('&').forEach(function (part) {
+      var i = part.indexOf('=');
+      if (i > 0) hp[decodeURIComponent(part.slice(0, i))] = decodeURIComponent(part.slice(i + 1));
+    });
+    if (hp.api) store.set('jv_api', hp.api);
+    if (hp.key) store.set('jv_key', hp.key);
+    if (hp.api || hp.key) history.replaceState(null, '', location.pathname);
+  }
+  var API = store.get('jv_api');
+  var KEY = store.get('jv_key');
+
+  var $ = function (id) { return document.getElementById(id); };
+  var WD = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  var MO = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  // ---- clock
+  function tick() {
+    var d = new Date();
+    var h = d.getHours() % 12 || 12;
+    $('clock').textContent = h + ':' + ('0' + d.getMinutes()).slice(-2);
+    $('ampm').textContent = d.getHours() < 12 ? 'AM' : 'PM';
+    $('date').textContent = d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+    var hr = d.getHours();
+    document.body.classList.toggle('night', hr >= 22 || hr < 6);
+    greetWord = hr < 12 ? 'Good morning' : hr < 18 ? 'Good afternoon' : 'Good evening';
+    renderGreet();
+  }
+
+  // ---- dates
+  function dateOnly(s) { var p = String(s).slice(0, 10).split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); }
+  function dayDiff(d) { var t = new Date(); t.setHours(0, 0, 0, 0); var x = new Date(d); x.setHours(0, 0, 0, 0); return Math.round((x - t) / 86400000); }
+  function dayWord(d) { var n = dayDiff(d); if (n === 0) return 'Today'; if (n === 1) return 'Tomorrow'; if (n > 1 && n < 7) return WD[d.getDay()]; return MO[d.getMonth()] + ' ' + d.getDate(); }
+  function timeWord(d) { var h = d.getHours() % 12 || 12; var m = d.getMinutes(); return h + (m ? ':' + ('0' + m).slice(-2) : '') + (d.getHours() < 12 ? ' AM' : ' PM'); }
+  function dueLabel(due) {
+    if (!due) return { text: 'No date', cls: '' };
+    var d = dateOnly(due), n = dayDiff(d);
+    if (n < 0) return { text: 'Overdue', cls: 'late' };
+    if (n === 0) return { text: 'Today', cls: 'today' };
+    return { text: dayWord(d), cls: '' };
+  }
+
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  function emptyLine(parent, text) { parent.replaceChildren(el('li', 'empty', text)); }
+
+  // ---- render
+  var data = null, greetWord = 'Hello';
+  function renderGreet() {
+    var g = $('greet');
+    g.replaceChildren(document.createTextNode(greetWord + ', Kevin. '));
+    if (!data) return;
+    var dueToday = (data.todos || []).filter(function (t) { return t.due && dayDiff(dateOnly(t.due)) <= 0; }).length;
+    if (dueToday) {
+      g.appendChild(el('b', null, String(dueToday)));
+      g.appendChild(document.createTextNode(dueToday === 1 ? ' thing due today.' : ' things due today.'));
+    } else {
+      g.appendChild(document.createTextNode('Nothing is due today.'));
+    }
+  }
+
+  function render() {
+    if (!data) return;
+    var todos = data.todos || [];
+    $('todo-count').textContent = todos.length ? todos.length + ' open' : '';
+    if (!todos.length) emptyLine($('todo-list'), 'Nothing due this week.');
+    else $('todo-list').replaceChildren.apply($('todo-list'), todos.map(function (t) {
+      var li = el('li');
+      var name = el('span', 'item');
+      name.appendChild(el('span', 'pri' + (t.priority === 'High' ? '' : ' none')));
+      name.appendChild(document.createTextNode(t.task));
+      var due = dueLabel(t.due);
+      li.appendChild(name); li.appendChild(el('span', 'when ' + due.cls, due.text));
+      return li;
+    }));
+
+    var evs = data.events || [];
+    if (!evs.length) emptyLine($('cal-list'), 'Nothing this week.');
+    else $('cal-list').replaceChildren.apply($('cal-list'), evs.map(function (e) {
+      var li = el('li');
+      var when = e.allDay ? dayWord(dateOnly(e.start)) : (function (d) { return dayWord(d) + ', ' + timeWord(d); })(new Date(e.start));
+      li.appendChild(el('span', 'when', when)); li.appendChild(el('span', 'item', e.title));
+      return li;
+    }));
+
+    var bills = data.bills || [];
+    if (!bills.length) emptyLine($('bill-list'), 'No bills due this week.');
+    else $('bill-list').replaceChildren.apply($('bill-list'), bills.map(function (b) {
+      var li = el('li');
+      var due = dueLabel(b.due);
+      li.appendChild(el('span', 'item', b.bill + (b.autopay ? '' : ' (pay)')));
+      li.appendChild(el('span', 'when ' + due.cls, due.text));
+      return li;
+    }));
+
+    var tb = $('trip-body'), tr = data.trip;
+    if (!tr) tb.replaceChildren(el('div', 'empty', 'No trips planned yet.'));
+    else {
+      var sd = tr.start ? dateOnly(tr.start) : null, n = sd ? dayDiff(sd) : null;
+      var days = el('div', 'trip-days', n === 0 ? 'Today' : n === 1 ? '1' : String(n));
+      if (n > 0) days.appendChild(el('small', null, n === 1 ? 'day' : 'days'));
+      tb.replaceChildren(days, el('div', 'trip-name', tr.trip), el('div', 'trip-where', (tr.destination || '') + (sd ? (tr.destination ? ', ' : '') + WD[sd.getDay()] + ' ' + MO[sd.getMonth()] + ' ' + sd.getDate() : '')));
+    }
+
+    var idea = data.idea;
+    $('idea-title').textContent = idea ? idea.idea : 'Your Someday list is empty.';
+    $('idea-meta').textContent = idea ? [idea.type, idea.effort].filter(Boolean).join(' · ') : '';
+    renderGreet();
+  }
+
+  // ---- data
+  var SAMPLE = {
+    sample: true,
+    todos: [
+      { task: 'Campion call with Kaleb', due: iso(0), priority: 'High' },
+      { task: 'Order Raspberry Pi gear', due: iso(0), priority: 'High' },
+      { task: 'Add my bills to the Jarvis Bills database', due: iso(1), priority: 'High' },
+      { task: 'Create Telegram bot with @BotFather', due: iso(3), priority: 'Medium' },
+      { task: 'Clean the car seats and put on the new seat covers', due: null, priority: 'High' }
+    ],
+    events: [{ title: 'Sample event', start: iso(1), allDay: true }],
+    bills: [], trip: null,
+    idea: { idea: 'Lazy Weather: warmer or colder than yesterday', type: 'Tech Project', effort: 'Weekend' }
+  };
+  function iso(n) { var d = new Date(Date.now() + n * 86400000); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+
+  function setStatus(text, isErr) { var s = $('status'); s.textContent = text; s.className = 'status' + (isErr ? ' err' : ''); }
+
+  function load() {
+    if (!API || !KEY) { data = SAMPLE; render(); setStatus('Sample data. Open the setup link once to connect.', true); return; }
+    fetch(API + (API.indexOf('?') < 0 ? '?' : '&') + 'key=' + encodeURIComponent(KEY) + '&t=' + Date.now())
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        if (!j.ok) throw new Error(j.error || 'error');
+        data = j; render();
+        store.set('jv_last', JSON.stringify(j));
+        setStatus('Updated ' + timeWord(new Date()) + (j.errors && j.errors.length ? ' · some items didn’t load' : ''), !!(j.errors && j.errors.length));
+      })
+      .catch(function () {
+        var last = store.get('jv_last');
+        if (last && !data) { try { data = JSON.parse(last); render(); } catch (e) {} }
+        setStatus('Offline, showing last update', true);
+      });
+  }
+
+  var WX = { 0: 'Clear', 1: 'Mostly clear', 2: 'Partly cloudy', 3: 'Cloudy', 45: 'Fog', 48: 'Fog', 51: 'Light drizzle', 53: 'Drizzle', 55: 'Drizzle', 56: 'Freezing drizzle', 57: 'Freezing drizzle', 61: 'Light rain', 63: 'Rain', 65: 'Heavy rain', 66: 'Freezing rain', 67: 'Freezing rain', 71: 'Light snow', 73: 'Snow', 75: 'Heavy snow', 77: 'Snow', 80: 'Showers', 81: 'Showers', 82: 'Heavy showers', 85: 'Snow showers', 86: 'Snow showers', 95: 'Thunderstorms', 96: 'Thunderstorms', 99: 'Thunderstorms' };
+  function loadWeather() {
+    var url = 'https://api.open-meteo.com/v1/forecast?latitude=' + LAT + '&longitude=' + LON +
+      '&current=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max' +
+      '&temperature_unit=fahrenheit&timezone=America%2FNew_York&past_days=1&forecast_days=1';
+    fetch(url).then(function (r) { return r.json(); }).then(function (w) {
+      var c = w.current, d = w.daily;
+      $('temp').textContent = Math.round(c.temperature_2m) + '°';
+      $('wx-cond').textContent = WX[c.weather_code] || 'Weather';
+      var rain = d.precipitation_probability_max[1];
+      $('wx-hilo').textContent = 'H ' + Math.round(d.temperature_2m_max[1]) + '°  L ' + Math.round(d.temperature_2m_min[1]) + '°' + (rain >= 30 ? '  ·  ' + rain + '% rain' : '');
+      var diff = d.temperature_2m_max[1] - d.temperature_2m_max[0];
+      var vs = $('wx-vs');
+      if (diff >= 3) { vs.textContent = 'Warmer than yesterday'; vs.className = 'wx-vs warmer'; }
+      else if (diff <= -3) { vs.textContent = 'Colder than yesterday'; vs.className = 'wx-vs colder'; }
+      else { vs.textContent = 'About the same as yesterday'; vs.className = 'wx-vs same'; }
+    }).catch(function () { $('wx-cond').textContent = 'Weather unavailable'; });
+  }
+
+  // ---- full screen and keep awake
+  var wakeLock = null;
+  function keepAwake() {
+    if ('wakeLock' in navigator && !wakeLock) {
+      navigator.wakeLock.request('screen').then(function (l) { wakeLock = l; l.addEventListener('release', function () { wakeLock = null; }); }).catch(function () {});
+    }
+  }
+  function goFull() {
+    var de = document.documentElement;
+    var req = de.requestFullscreen || de.webkitRequestFullscreen;
+    if (req && !(document.fullscreenElement || document.webkitFullscreenElement)) { try { var p = req.call(de); if (p && p.catch) p.catch(function () {}); } catch (e) {} }
+    keepAwake();
+    $('hint').style.opacity = '0';
+  }
+  document.addEventListener('click', goFull);
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') { keepAwake(); load(); loadWeather(); } });
+  var standalone = (window.matchMedia && (matchMedia('(display-mode: fullscreen)').matches || matchMedia('(display-mode: standalone)').matches));
+  if (standalone) $('hint').style.opacity = '0';
+  setTimeout(function () { $('hint').style.opacity = '0'; }, 15000);
+
+  if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js').catch(function () {}); }
+
+  tick(); setInterval(tick, 10000);
+  load(); setInterval(load, 5 * 60000);
+  loadWeather(); setInterval(loadWeather, 30 * 60000);
+  setTimeout(function () { location.reload(); }, 6 * 3600000); // fresh start every 6 hours
+  keepAwake();
+})();
+</script>
+</body>
+</html>
