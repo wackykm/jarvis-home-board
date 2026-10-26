@@ -226,8 +226,14 @@ body.night .board { filter: brightness(0.55); }
   function render() {
     if (!data) return;
     var todos = data.todos || [];
+    var errs = (data.errors || []).join(' ');
+    var notionDown = /Notion|NOTION_TOKEN/.test(errs);
+    var notionMsg = /404|shared with your integration/.test(errs)
+      ? 'Notion isn’t connected yet. In Notion, open the Jarvis page, then ••• > Connections > Jarvis Board.'
+      : 'Couldn’t reach Notion. Retrying in a few minutes.';
     $('todo-count').textContent = todos.length ? todos.length + ' open' : '';
-    if (!todos.length) emptyLine($('todo-list'), 'Nothing due this week.');
+    if (!todos.length && notionDown) emptyLine($('todo-list'), notionMsg);
+    else if (!todos.length) emptyLine($('todo-list'), 'Nothing due this week.');
     else $('todo-list').replaceChildren.apply($('todo-list'), todos.map(function (t) {
       var li = el('li');
       var name = el('span', 'item');
@@ -248,7 +254,7 @@ body.night .board { filter: brightness(0.55); }
     }));
 
     var bills = data.bills || [];
-    if (!bills.length) emptyLine($('bill-list'), 'No bills due this week.');
+    if (!bills.length) emptyLine($('bill-list'), notionDown ? 'Waiting on Notion.' : 'No bills due this week.');
     else $('bill-list').replaceChildren.apply($('bill-list'), bills.map(function (b) {
       var li = el('li');
       var due = dueLabel(b.due);
@@ -258,7 +264,7 @@ body.night .board { filter: brightness(0.55); }
     }));
 
     var tb = $('trip-body'), tr = data.trip;
-    if (!tr) tb.replaceChildren(el('div', 'empty', 'No trips planned yet.'));
+    if (!tr) tb.replaceChildren(el('div', 'empty', notionDown ? 'Waiting on Notion.' : 'No trips planned yet.'));
     else {
       var sd = tr.start ? dateOnly(tr.start) : null, n = sd ? dayDiff(sd) : null;
       var days = el('div', 'trip-days', n === 0 ? 'Today' : n === 1 ? '1' : String(n));
@@ -267,7 +273,7 @@ body.night .board { filter: brightness(0.55); }
     }
 
     var idea = data.idea;
-    $('idea-title').textContent = idea ? idea.idea : 'Your Someday list is empty.';
+    $('idea-title').textContent = idea ? idea.idea : (notionDown ? 'Waiting on Notion.' : 'Your Someday list is empty.');
     $('idea-meta').textContent = idea ? [idea.type, idea.effort].filter(Boolean).join(' · ') : '';
     renderGreet();
   }
