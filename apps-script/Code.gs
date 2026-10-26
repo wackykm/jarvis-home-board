@@ -24,6 +24,7 @@ function doGet(e) {
   if (!props.getProperty('BOARD_KEY') || key !== props.getProperty('BOARD_KEY')) {
     return json_({ ok: false, error: 'bad_key' });
   }
+  if (e.parameter && e.parameter.debug) return json_(notionDebug_());
   var cache = CacheService.getScriptCache();
   var cached = cache.get('board');
   if (cached && !(e.parameter && e.parameter.fresh)) {
@@ -50,21 +51,12 @@ function testFeed() {
 // ---------- Notion ----------
 
 function getTodos_() {
+  // Notion only allows two levels of nested filters, so fetch every open task and narrow it here.
+  var weekOut = isoDate_(7);
   var rows = queryNotion_(DB.todos, {
-    filter: {
-      and: [
-        { property: 'Status', status: { does_not_equal: 'Done' } },
-        { or: [
-          { property: 'Due', date: { on_or_before: isoDate_(7) } },
-          { and: [
-            { property: 'Due', date: { is_empty: true } },
-            { property: 'Priority', select: { equals: 'High' } }
-          ] }
-        ] }
-      ]
-    },
+    filter: { property: 'Status', status: { does_not_equal: 'Done' } },
     sorts: [{ property: 'Due', direction: 'ascending' }],
-    page_size: 25
+    page_size: 100
   });
   return rows.map(function (p) {
     return {
@@ -73,7 +65,9 @@ function getTodos_() {
       priority: selectName_(p.properties.Priority),
       area: selectName_(p.properties.Area)
     };
-  });
+  }).filter(function (t) {
+    return t.due ? t.due.slice(0, 10) <= weekOut : t.priority === 'High';
+  }).slice(0, 25);
 }
 
 function getBills_() {
@@ -183,4 +177,17 @@ function safe_(out, name, fn) {
 }
 function json_(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
+}
+
+/** Shows which Notion workspace the key belongs to and what it can see. */
+function notionDebug_() {
+  var token = PropertiesService.getScriptProperties().getProperty('NOTION_TOKEN');
+  var h = { Authorization: 'Bearer ' + token, 'Notion-Version': '2022-06-28' };
+  var me = JSON.parse(UrlFetchApp.fetch('https://api.notion.com/v1/users/me', { headers: h, muteHttpExceptions: true }).getContentText());
+  var s = JSON.parse(UrlFetchApp.fetch('https://api.notion.com/v1/search', { method: 'post', contentType: 'application/json', headers: h, payload: JSON.stringify({ page_size: 50 }), muteHttpExceptions: true }).getContentText());
+  var items = (s.results || []).map(function (r) {
+    var t = r.object === 'database' ? (r.title || []) : ((r.properties && (r.properties.title || r.properties.Name || {}).title) || []);
+    return r.object + ': ' + t.map(function (x) { return x.plain_text; }).join('') + ' (' + r.id + ')';
+  });
+  return { workspace: me.bot && me.bot.workspace_name, integration: me.name, canSee: items, error: s.message || null };
 }
